@@ -59,6 +59,8 @@ CREATE TYPE department_type AS ENUM (
 CREATE TABLE IF NOT EXISTS doctors (
     id             UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id        UUID            UNIQUE REFERENCES users(id) ON DELETE SET NULL,
+    first_name     VARCHAR(100)    NOT NULL,
+    last_name      VARCHAR(100)    NOT NULL,
     specialization VARCHAR(150)    NOT NULL,
     department     department_type NOT NULL,
     phone          VARCHAR(20),
@@ -81,7 +83,7 @@ CREATE TYPE blood_group  AS ENUM ('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O
 
 CREATE TABLE IF NOT EXISTS patients (
     id                UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-    doctor_id         UUID         REFERENCES doctors(id) ON DELETE SET NULL,
+    doctor_id         UUID         NOT NULL REFERENCES doctors(id) ON DELETE RESTRICT,
     first_name        VARCHAR(100) NOT NULL,
     last_name         VARCHAR(100) NOT NULL,
     date_of_birth     DATE         NOT NULL,
