@@ -21,7 +21,7 @@ export const openApiDocument = {
       },
     },
     schemas: {
-      RegisterRequest: {
+      UserCreateRequest: {
         type: 'object',
         required: ['firstName', 'lastName', 'email', 'password'],
         properties: {
@@ -29,7 +29,7 @@ export const openApiDocument = {
           lastName: { type: 'string', example: 'User' },
           email: { type: 'string', example: 'admin@caretrack.test' },
           password: { type: 'string', example: 'StrongPass123' },
-          role: { type: 'string', enum: ['admin', 'clinician', 'receptionist'] },
+          role: { type: 'string', enum: ['admin', 'receptionist'] },
         },
       },
       LoginRequest: {
@@ -40,9 +40,55 @@ export const openApiDocument = {
           password: { type: 'string', example: 'StrongPass123' },
         },
       },
-      DoctorRequest: {
+      ForgotPasswordRequest: {
         type: 'object',
-        required: ['firstName', 'lastName', 'specialization', 'department', 'email'],
+        required: ['email'],
+        properties: {
+          email: { type: 'string', example: 'clinician@caretrack.test' },
+        },
+      },
+      ResetPasswordRequest: {
+        type: 'object',
+        required: ['id', 'password', 'resetToken'],
+        properties: {
+          id: { type: 'string', format: 'uuid' },
+          password: { type: 'string', example: 'NewStrongPass123' },
+          resetToken: { type: 'string' },
+        },
+      },
+      ChangePasswordRequest: {
+        type: 'object',
+        required: ['currentPassword', 'newPassword'],
+        properties: {
+          currentPassword: { type: 'string', example: 'OldStrongPass123' },
+          newPassword: { type: 'string', example: 'NewStrongPass123' },
+        },
+      },
+      ProfileUpdateRequest: {
+        type: 'object',
+        properties: {
+          firstName: { type: 'string', example: 'Ali' },
+          lastName: { type: 'string', example: 'Valiyev' },
+          email: { type: 'string', example: 'ali.valiyev@caretrack.test' },
+        },
+      },
+      DoctorCreateRequest: {
+        type: 'object',
+        required: ['firstName', 'lastName', 'specialization', 'department', 'email', 'password'],
+        properties: {
+          firstName: { type: 'string', example: 'Dilshod' },
+          lastName: { type: 'string', example: 'Karimov' },
+          password: { type: 'string', example: 'DoctorPass123' },
+          specialization: { type: 'string', example: 'Cardiologist' },
+          department: { type: 'string', enum: ['general_practice', 'cardiology', 'neurology', 'dermatology', 'orthopedics', 'diagnostics', 'emergency'] },
+          phone: { type: 'string', example: '+998901234567' },
+          email: { type: 'string', example: 'd.karimov@caretrack.test' },
+          roomNumber: { type: 'string', example: '204' },
+          isAvailable: { type: 'boolean', example: true },
+        },
+      },
+      DoctorUpdateRequest: {
+        type: 'object',
         properties: {
           firstName: { type: 'string', example: 'Dilshod' },
           lastName: { type: 'string', example: 'Karimov' },
@@ -95,12 +141,13 @@ export const openApiDocument = {
     },
   },
   paths: {
-    '/auth/register': {
+    '/auth/users': {
       post: {
         tags: ['Auth'],
-        summary: 'Register a user',
-        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/RegisterRequest' } } } },
-        responses: { 201: { description: 'User registered' } },
+        security: [{ bearerAuth: [] }],
+        summary: 'Create admin or receptionist user. Admin only.',
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/UserCreateRequest' } } } },
+        responses: { 201: { description: 'User created' }, 403: { description: 'Admin access required' } },
       },
     },
     '/auth/login': {
@@ -119,8 +166,51 @@ export const openApiDocument = {
         responses: { 200: { description: 'Current user' } },
       },
     },
-    '/doctors': createCrudPath('Doctors', 'DoctorRequest', ['search', 'department', 'isAvailable']),
-    '/doctors/{id}': createItemPath('Doctors', 'DoctorRequest'),
+    '/auth/profile': {
+      patch: {
+        tags: ['Auth'],
+        security: [{ bearerAuth: [] }],
+        summary: 'Update current user profile fields',
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/ProfileUpdateRequest' } } } },
+        responses: { 200: { description: 'Profile updated' } },
+      },
+    },
+    '/auth/change-password': {
+      patch: {
+        tags: ['Auth'],
+        security: [{ bearerAuth: [] }],
+        summary: 'Change current user password',
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/ChangePasswordRequest' } } } },
+        responses: { 200: { description: 'Password changed' } },
+      },
+    },
+    '/auth/forgot-password': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Generate password reset token',
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/ForgotPasswordRequest' } } } },
+        responses: { 200: { description: 'Reset token generated or accepted' } },
+      },
+    },
+    '/auth/reset-password': {
+      post: {
+        tags: ['Auth'],
+        summary: 'Reset password with user id and reset token',
+        requestBody: { required: true, content: { 'application/json': { schema: { $ref: '#/components/schemas/ResetPasswordRequest' } } } },
+        responses: { 200: { description: 'Password reset' } },
+      },
+    },
+    '/auth/users/{id}': {
+      delete: {
+        tags: ['Auth'],
+        security: [{ bearerAuth: [] }],
+        summary: 'Delete user. Admin only.',
+        parameters: [idParameter()],
+        responses: { 204: { description: 'Deleted' }, 403: { description: 'Admin access required' }, 404: { description: 'Not found' } },
+      },
+    },
+    '/doctors': createCrudPath('Doctors', 'DoctorCreateRequest', ['search', 'department', 'isAvailable']),
+    '/doctors/{id}': createItemPath('Doctors', 'DoctorUpdateRequest'),
     '/patients': createCrudPath('Patients', 'PatientRequest', ['search', 'doctorId', 'gender']),
     '/patients/{id}': createItemPath('Patients', 'PatientRequest'),
     '/patients/{id}/profile': {

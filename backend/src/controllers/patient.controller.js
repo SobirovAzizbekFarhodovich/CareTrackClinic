@@ -1,6 +1,7 @@
 import db from '../database/data.js';
+import { getDoctorForClinician } from '../utils/doctorScope.js';
 
-function patientFilters(query) {
+function patientFilters(query, forcedDoctorId = null) {
   const conditions = [];
   const values = [];
 
@@ -11,7 +12,10 @@ function patientFilters(query) {
     );
   }
 
-  if (query.doctorId) {
+  if (forcedDoctorId) {
+    values.push(forcedDoctorId);
+    conditions.push(`p.doctor_id = $${values.length}`);
+  } else if (query.doctorId) {
     values.push(query.doctorId);
     conditions.push(`p.doctor_id = $${values.length}`);
   }
@@ -40,17 +44,22 @@ const patientSelect = `
 
 export async function getPatients(req, res) {
   try {
-    const { where, values } = patientFilters(req.query);
+    const doctor = await getDoctorForClinician(req.user);
+    const { where, values } = patientFilters(req.query, doctor?.id);
     const patients = await db.any(`${patientSelect} ${where} ORDER BY p.created_at DESC`, values);
     return res.status(200).json({ data: patients });
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to fetch patients', error: error.message });
+    return res.status(error.status || 500).json({ message: 'Failed to fetch patients', error: error.message });
   }
 }
 
 export async function getPatientById(req, res) {
   try {
-    const patient = await db.oneOrNone(`${patientSelect} WHERE p.id = $1`, [req.params.id]);
+    const doctor = await getDoctorForClinician(req.user);
+    const patient = await db.oneOrNone(
+      `${patientSelect} WHERE p.id = $1 ${doctor ? 'AND p.doctor_id = $2' : ''}`,
+      doctor ? [req.params.id, doctor.id] : [req.params.id]
+    );
 
     if (!patient) {
       return res.status(404).json({ message: 'Patient not found' });
@@ -58,19 +67,20 @@ export async function getPatientById(req, res) {
 
     return res.status(200).json({ data: patient });
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to fetch patient', error: error.message });
+    return res.status(error.status || 500).json({ message: 'Failed to fetch patient', error: error.message });
   }
 }
 
 export async function getPatientProfile(req, res) {
   try {
+    const doctorScope = await getDoctorForClinician(req.user);
     const patient = await db.oneOrNone(
       `SELECT id, doctor_id, first_name, last_name, date_of_birth, gender, blood_group,
               phone, email, address, emergency_contact, emergency_phone, insurance_number,
               notes, is_active, registered_at, created_at, updated_at
        FROM patients
-       WHERE id = $1`,
-      [req.params.id]
+       WHERE id = $1 ${doctorScope ? 'AND doctor_id = $2' : ''}`,
+      doctorScope ? [req.params.id, doctorScope.id] : [req.params.id]
     );
 
     if (!patient) {
@@ -97,7 +107,7 @@ export async function getPatientProfile(req, res) {
 
     return res.status(200).json({ data: { ...patient, doctor, illnesses } });
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to fetch patient profile', error: error.message });
+    return res.status(error.status || 500).json({ message: 'Failed to fetch patient profile', error: error.message });
   }
 }
 
@@ -156,6 +166,7 @@ export async function createPatient(req, res) {
 
 export async function updatePatient(req, res) {
   try {
+    const doctorScope = await getDoctorForClinician(req.user);
     const {
       doctorId,
       firstName,
@@ -172,6 +183,7 @@ export async function updatePatient(req, res) {
       notes,
       isActive,
     } = req.body;
+    const doctorIdForUpdate = doctorScope ? undefined : doctorId;
 
     const patient = await db.oneOrNone(
       `UPDATE patients
@@ -189,13 +201,13 @@ export async function updatePatient(req, res) {
            insurance_number = COALESCE($13, insurance_number),
            notes = COALESCE($14, notes),
            is_active = COALESCE($15, is_active)
-       WHERE id = $1
+       WHERE id = $1 ${doctorScope ? 'AND doctor_id = $16' : ''}
        RETURNING id, doctor_id, first_name, last_name, date_of_birth, gender, blood_group,
                  phone, email, address, emergency_contact, emergency_phone,
                  insurance_number, notes, is_active, registered_at, created_at, updated_at`,
       [
         req.params.id,
-        doctorId,
+        doctorIdForUpdate,
         firstName,
         lastName,
         dateOfBirth,
@@ -209,6 +221,7 @@ export async function updatePatient(req, res) {
         insuranceNumber,
         notes,
         isActive,
+        ...(doctorScope ? [doctorScope.id] : []),
       ]
     );
 
@@ -218,7 +231,7 @@ export async function updatePatient(req, res) {
 
     return res.status(200).json({ data: patient });
   } catch (error) {
-    return res.status(500).json({ message: 'Failed to update patient', error: error.message });
+    return res.status(error.status || 500).json({ message: 'Failed to update patient', error: error.message });
   }
 }
 

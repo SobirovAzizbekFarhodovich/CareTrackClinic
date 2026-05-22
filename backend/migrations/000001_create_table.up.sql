@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS users (
     last_name     VARCHAR(100) NOT NULL,
     email         VARCHAR(255) NOT NULL UNIQUE,
     password_hash TEXT         NOT NULL,
+    password_reset_token_hash TEXT,
+    password_reset_expires_at TIMESTAMPTZ,
     role          user_role    NOT NULL DEFAULT 'receptionist',
     is_active     BOOLEAN      NOT NULL DEFAULT TRUE,
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -58,7 +60,7 @@ CREATE TYPE department_type AS ENUM (
 
 CREATE TABLE IF NOT EXISTS doctors (
     id             UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id        UUID            UNIQUE REFERENCES users(id) ON DELETE SET NULL,
+    user_id        UUID            NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     first_name     VARCHAR(100)    NOT NULL,
     last_name      VARCHAR(100)    NOT NULL,
     specialization VARCHAR(150)    NOT NULL,

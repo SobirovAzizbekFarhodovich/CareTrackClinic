@@ -32,6 +32,7 @@ if (fs.existsSync(envPath)) {
 
 export const config = {
   port: process.env.PORT || 3000,
+  appBaseUrl: process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 3000}`,
   jwtSecret: process.env.JWT_SECRET || 'development_secret_change_me',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '1d',
   db: process.env.DATABASE_URL || {
